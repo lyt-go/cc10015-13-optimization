@@ -1,6 +1,7 @@
 """样本分群业务规则：提供分群人员列表供AB分析消费。"""
 from __future__ import annotations
 
+import random
 import time
 from typing import Any
 
@@ -39,7 +40,11 @@ class SampleGroupService:
         return store.find(MODULE, entry_id)
 
     def get_group_members(self, group_id: int) -> list[dict[str, Any]]:
-        """生成分群的模拟用户列表，供AB分析消费。"""
+        """生成分群的模拟用户列表，供AB分析消费。
+
+        随机数按分群播种：同一分群重复读取得到的成员明细完全一致，
+        下游（如分群对比）重算时不会因为随机漂移而改变结果。
+        """
         sg = self.get_entry(group_id)
         if sg is None:
             return []
@@ -49,14 +54,14 @@ class SampleGroupService:
             base = 1000
         members: list[dict] = []
         group_type = sg.get("group_type", "control")
+        rng = random.Random(f"sample_group:{group_id}:{base}:{group_type}")
         for i in range(min(base, 500)):  # 上限500避免内存爆炸
             user_id = f"U{group_id}{i:04d}"
             # 实验组用户指标值偏高，对照组偏低，形成可检测差异
-            import random
             if group_type == "experiment":
-                value = random.gauss(mu=0.62, sigma=0.08)
+                value = rng.gauss(mu=0.62, sigma=0.08)
             else:
-                value = random.gauss(mu=0.55, sigma=0.08)
+                value = rng.gauss(mu=0.55, sigma=0.08)
             members.append({
                 "user_id": user_id,
                 "group_id": group_id,

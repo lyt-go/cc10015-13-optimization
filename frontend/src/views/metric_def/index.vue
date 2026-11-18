@@ -72,6 +72,36 @@
       </form>
     </div>
 
+    <div class="validation-panel">
+      <div class="page-head">
+        <div>
+          <h3>分群对比结果校验</h3>
+          <p class="page-desc">跨模块联动：读取分群对比结果表的指标编号，按显著性字段校验每条任务结果。</p>
+        </div>
+        <div class="page-actions">
+          <button class="btn" data-testid="load-validation" type="button" :disabled="validating" @click="loadValidation">
+            {{ validating ? '校验中…' : '校验分群对比结果' }}
+          </button>
+        </div>
+      </div>
+      <table v-if="validation" class="data-table" data-testid="validation-table">
+        <thead>
+          <tr><th v-for="column in validationColumns" :key="column">{{ column }}</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="(item, i) in validation.items" :key="i" :data-status="item.校验结果">
+            <td v-for="column in validationColumns" :key="column">{{ item[column] ?? '—' }}</td>
+          </tr>
+          <tr v-if="!validation.items.length">
+            <td :colspan="validationColumns.length" class="empty-state">分群对比结果表暂无确认结果</td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-if="validation" class="page-desc" data-testid="validation-summary">
+        共 {{ validation.total }} 条任务结果：通过 {{ validation.passed }} 条，未通过 {{ validation.failed }} 条
+      </p>
+    </div>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条指标定义记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -100,6 +130,9 @@ const filterFields = columns.slice(0, 3)
 const showCreate = ref(false)
 const creating = ref(false)
 const createValues = ref<Record<string, string>>({})
+const validationColumns = ["批次号", "任务编号", "指标编号", "指标名称", "显著性", "差异", "p值", "校验结果", "说明"]
+const validation = ref<{ items: Row[]; total: number; passed: number; failed: number } | null>(null)
+const validating = ref(false)
 const stats = computed(() => [
   { label: metricNames[0], value: total.value },
   { label: metricNames[1], value: rows.value.filter((row) => row.status === statuses[1]).length },
@@ -184,5 +217,38 @@ async function reload() {
   }
 }
 
+async function loadValidation() {
+  validating.value = true
+  errorMessage.value = ''
+  try {
+    const response = await request(`${ENDPOINT}/compare_validation`)
+    if (!response.ok) throw new Error('分群对比结果校验读取失败')
+    validation.value = await response.json()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '分群对比结果校验读取失败'
+  } finally {
+    validating.value = false
+  }
+}
+
 onMounted(reload)
 </script>
+
+<style scoped>
+.validation-panel {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.validation-panel h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.validation-panel td[data-status],
+.validation-panel tr[data-status='未通过'] td {
+  color: #b42318;
+}
+.validation-panel tr[data-status='通过'] td {
+  color: inherit;
+}
+</style>

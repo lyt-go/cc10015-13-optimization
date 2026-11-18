@@ -22,6 +22,7 @@ from app.services.drill_down import DrillDownService
 def _clear_all():
     for k in list(store._tables.keys()):
         store._tables[k] = []
+    store._sequences.clear()
 
 def test_pipeline_experiment_to_sample_groups():
     """实验创建后自动生成对照和实验组分群。"""

@@ -35,6 +35,21 @@ class ActionPayload(BaseModel):
     remark: str | None = None
 
 
+class BatchSubmitPayload(BaseModel):
+    """分群对比整批提交：不传 task_ids 表示提交全部未废弃任务。"""
+
+    task_ids: list[int] | None = None
+    strategy: str = "keep_completed"
+    simulate_failures: list[int] | None = None  # 演示用：模拟这些任务超时
+
+
+class BatchResumePayload(BaseModel):
+    """批次续算：版本冲突时按 strategy 判定保留成功结果或整批回滚。"""
+
+    strategy: str = "keep_completed"
+    expected_version: int | None = None
+
+
 
 class ExperimentEntry(BaseModel):
     """实验方案明细结构。"""

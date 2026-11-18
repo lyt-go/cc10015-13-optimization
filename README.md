@@ -75,5 +75,22 @@ npm run dev
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
 
+## 分群对比批次机制
+
+- `POST /api/segment_compare/batch` 一次提交整组任务：逐条计算并逐条给出独立回执，
+  未完成项进入待补列表随后处理；重复提交复用同一批次，已完成结果不重算。
+- 批量结果与单任务完成回执在同一事务落库（结果表 `segment_compare_result`、
+  回执表 `segment_compare_receipt`、批次表 `segment_compare_batch`），提交前核对
+  结果与回执一一对应，发现事务残留即整体回滚。
+- 计算只依赖分群成员明细（按分群播种，重复读取一致）与 Welch t 检验，不含随机数，
+  重试不会改变已完成任务的差异与显著性。
+- 批次中断后 `POST /api/segment_compare/batch/{批次号}/resume` 续算：
+  `keep_completed`（默认）保留成功结果只补算未完成任务；`rollback_all` 将本批
+  结果回滚为空并从首个任务重新生成。携带过期 `expected_version` 会返回版本冲突。
+- 列表页 `GET /api/segment_compare` 与详情页 `GET /api/segment_compare/{id}`
+  都读取这份确认结果；消费端经 `GET /api/segment_compare/results` 读取全量结果表。
+- 跨模块联动：`GET /api/metric_def/compare_validation` 由指标定义模块读取结果表
+  中的指标编号，按显著性字段复核每条任务结果。
+
 领域：数据工程
 子方向：数据分析与数据应用
